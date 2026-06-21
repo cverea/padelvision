@@ -67,3 +67,65 @@ class CameraCapture:
             if keyboard.is_pressed(self.config.quit_key):
                 print("Exiting.")
                 break
+
+    def record_videos(self, duration_s: float | None = None) -> tuple[Path, Path]:
+        """Record both camera video streams to files simultaneously.
+
+        Each camera's MJPEG feed is read in its own thread, gated on a shared
+        barrier so the two recordings start together, and stopped together via a
+        shared event. Recording runs for ``duration_s`` seconds, or until the
+        quit key is pressed when no duration is given. Returns the two paths.
+        """
+        import threading
+
+        import cv2
+
+        out1 = Path(self.config.camera1_video)
+        out2 = Path(self.config.camera2_video)
+        stop = threading.Event()
+        ready = threading.Barrier(2)
+
+        def worker(ip: str, out_path: Path) -> None:
+            cap = cv2.VideoCapture(self.config.video_url(ip))
+            writer = None
+            ready.wait()  # both cameras begin reading at the same moment
+            try:
+                while not stop.is_set():
+                    ok, frame = cap.read()
+                    if not ok:
+                        break
+                    if writer is None:
+                        h, w = frame.shape[:2]
+                        writer = cv2.VideoWriter(
+                            str(out_path),
+                            cv2.VideoWriter_fourcc(*"MJPG"),
+                            self.config.record_fps,
+                            (w, h),
+                        )
+                    writer.write(frame)
+            finally:
+                cap.release()
+                if writer is not None:
+                    writer.release()
+
+        threads = [
+            threading.Thread(target=worker, args=(self.config.camera1_ip, out1)),
+            threading.Thread(target=worker, args=(self.config.camera2_ip, out2)),
+        ]
+        for t in threads:
+            t.start()
+
+        if duration_s is not None:
+            import time
+
+            time.sleep(duration_s)
+        else:
+            import keyboard  # lazy: only needed for interactive stop
+
+            print(f"Recording... press '{self.config.quit_key}' to stop.")
+            keyboard.wait(self.config.quit_key)
+
+        stop.set()
+        for t in threads:
+            t.join()
+        return out1, out2

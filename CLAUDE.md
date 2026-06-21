@@ -12,8 +12,8 @@ The code is organized as a single installable `padelvision` package; every stage
 
 - `padelvision/config.py` — **all tunable parameters** live here as dataclasses (`CaptureConfig`, `CalibrationConfig`, `DetectionConfig`, `CourtConfig`, aggregated by `Config`). Stdlib-only (no cv2/numpy) so it imports anywhere; `Config.save/load` round-trips JSON and `from_dict` ignores unknown keys. When adding a parameter, add it here rather than hard-coding it in a module.
 - `padelvision/detection/` — `tracknet.build_tracknet()` (Keras imported lazily inside the function so the package imports without TensorFlow); `tracker.BallTracker` runs the model over a video. `tracker.locate_ball(heatmap, config)` is the pure heatmap→circle step, separated so it's unit-testable without Keras.
-- `padelvision/calibration/` — `stereo.StereoCalibrator` (returns a `StereoCalibrationResult` dataclass and optionally writes `stereo_params.yml`; GUI display is opt-in via `show=`). `capture.CameraCapture` pulls frames from two IP webcams; its HTTP fetch is injectable (`fetcher=`) so it's testable, and `requests`/`keyboard` are imported lazily.
-- `padelvision/geometry/` — `court.court_segments()/court_keypoints()` build the court purely (no plotting). `triangulation.Triangulator` does the real triangulation; `Triangulator.from_stereo_params("stereo_params.yml")` builds projection matrices `P1 = K1[I|0]`, `P2 = K2[R|T]` from the calibration file.
+- `padelvision/calibration/` — `stereo.StereoCalibrator` (returns a `StereoCalibrationResult` dataclass and optionally writes `stereo_params.yml`; GUI display is opt-in via `show=`). `capture.CameraCapture` talks to two IP webcams: `capture_pair()` grabs still photos (HTTP fetch injectable via `fetcher=` so it's testable), and `record_videos()` records both MJPEG streams to files at once — one thread per camera, gated on a `threading.Barrier` so they start together and a shared `Event` so they stop together (best-effort sync for two independent cameras). `requests`/`keyboard` are imported lazily.
+- `padelvision/geometry/` — `court.court_segments()/court_keypoints()` build the court purely (no plotting). `triangulation.Triangulator` does the real triangulation; `Triangulator.from_stereo_params("stereo_params.yml")` builds projection matrices `P1 = K1[I|0]`, `P2 = K2[R|T]` from the calibration file. `triangulation.matched_points(det1, det2)` is the glue for the two-video `reconstruct` flow: it aligns two per-frame `Detections` dicts, keeping only frames where **both** cameras found the ball, and returns `(pts1, pts2, frames)` ready for `triangulate`.
 - `padelvision/viz/plotting.py` — matplotlib plots (`plot_court`, `plot_trajectory`, `plot_court_with_trajectory`). Lazy matplotlib import, **nothing runs at import time**.
 - `padelvision/cli.py` — argparse entry point (`padelvision <command>` or `python -m padelvision.cli`); each command imports its heavy deps lazily.
 
@@ -28,8 +28,10 @@ pytest tests/test_triangulation.py::test_triangulate_recovers_known_points  # si
 
 padelvision write-config config.json   # emit default config to edit
 padelvision calibrate [--show]         # stereo-calibrate camera1/+camera2/ -> stereo_params.yml
+padelvision record [--duration 10]     # record both camera streams to camera1.avi/camera2.avi
 padelvision detect <video> --stub balls.pkl
 padelvision triangulate cam1.csv cam2.csv --params stereo_params.yml --plot
+padelvision reconstruct cam1.avi cam2.avi --params stereo_params.yml --plot  # detect on both + triangulate
 padelvision court
 ```
 

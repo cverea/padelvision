@@ -21,14 +21,21 @@ class CaptureConfig:
     camera2_ip: str = "192.168.0.25"
     port: int = 8080
     photo_endpoint: str = "photo.jpg"
+    video_endpoint: str = "video"  # IP Webcam MJPEG stream path
     camera1_dir: str = "camera1"
     camera2_dir: str = "camera2"
+    camera1_video: str = "camera1.avi"  # recorded video output paths
+    camera2_video: str = "camera2.avi"
+    record_fps: float = 30.0
     capture_key: str = "p"
     quit_key: str = "q"
     timeout_s: float = 5.0
 
     def photo_url(self, ip: str) -> str:
         return f"http://{ip}:{self.port}/{self.photo_endpoint}"
+
+    def video_url(self, ip: str) -> str:
+        return f"http://{ip}:{self.port}/{self.video_endpoint}"
 
 
 @dataclass

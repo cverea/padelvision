@@ -32,6 +32,14 @@ def _cmd_calibrate(args: argparse.Namespace) -> None:
     print(f"Saved parameters to {_load_config(args.config).calibration.output_path}")
 
 
+def _cmd_record(args: argparse.Namespace) -> None:
+    from padelvision.calibration import CameraCapture
+
+    capture = CameraCapture(_load_config(args.config).capture)
+    out1, out2 = capture.record_videos(duration_s=args.duration)
+    print(f"Recorded {out1} and {out2}")
+
+
 def _cmd_detect(args: argparse.Namespace) -> None:
     from padelvision.detection import BallTracker
 
@@ -62,6 +70,34 @@ def _cmd_triangulate(args: argparse.Namespace) -> None:
         plot_court_with_trajectory(points_3d, _load_config(args.config).court)
 
 
+def _cmd_reconstruct(args: argparse.Namespace) -> None:
+    import numpy as np
+
+    from padelvision.detection import BallTracker
+    from padelvision.geometry import Triangulator, matched_points
+
+    cfg = _load_config(args.config)
+    tracker = BallTracker(cfg.detection)  # one model, reused for both views
+    det1 = tracker.detect(args.video1, read_from_stub=args.read_from_stub, stub_path=args.stub1)
+    det2 = tracker.detect(args.video2, read_from_stub=args.read_from_stub, stub_path=args.stub2)
+
+    pts1, pts2, frames = matched_points(det1, det2)
+    print(f"Ball found in both views on {len(frames)} frames.")
+    if not frames:
+        return
+
+    points_3d = Triangulator.from_stereo_params(args.params).triangulate(pts1, pts2)
+    if args.out:
+        np.savetxt(args.out, points_3d, delimiter=",")
+        print(f"Wrote {len(points_3d)} 3D points to {args.out}")
+    else:
+        print(points_3d)
+    if args.plot:
+        from padelvision.viz import plot_court_with_trajectory
+
+        plot_court_with_trajectory(points_3d, cfg.court)
+
+
 def _cmd_court(args: argparse.Namespace) -> None:
     from padelvision.viz import plot_court
 
@@ -85,6 +121,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--show", action="store_true", help="Display detected corners.")
     p.set_defaults(func=_cmd_calibrate)
 
+    p = sub.add_parser("record", help="Record two camera videos simultaneously.")
+    p.add_argument(
+        "--duration", type=float,
+        help="Seconds to record (default: until the quit key is pressed).",
+    )
+    p.set_defaults(func=_cmd_record)
+
     p = sub.add_parser("detect", help="Detect the ball in a video.")
     p.add_argument("video", help="Path to the input video.")
     p.add_argument("--stub", help="Path to read/write cached detections.")
@@ -98,6 +141,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", help="CSV path to write 3D points (otherwise printed).")
     p.add_argument("--plot", action="store_true", help="Plot the trajectory on the court.")
     p.set_defaults(func=_cmd_triangulate)
+
+    p = sub.add_parser(
+        "reconstruct",
+        help="Detect the ball in two videos and triangulate its 3D trajectory.",
+    )
+    p.add_argument("video1", help="Path to the camera-1 video.")
+    p.add_argument("video2", help="Path to the camera-2 video.")
+    p.add_argument("--params", default="stereo_params.yml", help="Stereo params YAML.")
+    p.add_argument("--stub1", help="Cache path for camera-1 detections.")
+    p.add_argument("--stub2", help="Cache path for camera-2 detections.")
+    p.add_argument("--read-from-stub", action="store_true", dest="read_from_stub")
+    p.add_argument("--out", help="CSV path to write 3D points (otherwise printed).")
+    p.add_argument("--plot", action="store_true", help="Plot the trajectory on the court.")
+    p.set_defaults(func=_cmd_reconstruct)
 
     p = sub.add_parser("court", help="Plot the padel court model.")
     p.set_defaults(func=_cmd_court)

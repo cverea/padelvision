@@ -7,10 +7,29 @@ can be built directly from the ``stereo_params.yml`` produced by
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
+
+
+def matched_points(
+    det1: Dict[int, Optional[Tuple[int, int]]],
+    det2: Dict[int, Optional[Tuple[int, int]]],
+) -> Tuple[np.ndarray, np.ndarray, List[int]]:
+    """Align two per-frame detection dicts into paired point arrays.
+
+    Keeps only frames where *both* cameras found the ball. Returns
+    ``(pts1, pts2, frames)`` where ``pts1``/``pts2`` are (N, 2) arrays ready for
+    :meth:`Triangulator.triangulate` and ``frames`` lists the frame indices used.
+    """
+    frames = [
+        f for f in sorted(det1.keys() & det2.keys())
+        if det1[f] is not None and det2[f] is not None
+    ]
+    pts1 = np.array([det1[f] for f in frames], dtype=float).reshape(-1, 2)
+    pts2 = np.array([det2[f] for f in frames], dtype=float).reshape(-1, 2)
+    return pts1, pts2, frames
 
 
 def projection_matrix(K: np.ndarray, R: np.ndarray, T: np.ndarray) -> np.ndarray:

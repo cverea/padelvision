@@ -2,7 +2,11 @@ import cv2
 import numpy as np
 import pytest
 
-from padelvision.geometry.triangulation import Triangulator, projection_matrix
+from padelvision.geometry.triangulation import (
+    Triangulator,
+    matched_points,
+    projection_matrix,
+)
 
 
 def _project(P, points_3d):
@@ -69,3 +73,18 @@ def test_from_stereo_params_round_trip(tmp_path, stereo_setup):
 def test_from_stereo_params_missing_file(tmp_path):
     with pytest.raises(FileNotFoundError):
         Triangulator.from_stereo_params(tmp_path / "nope.yml")
+
+
+def test_matched_points_keeps_only_frames_seen_in_both():
+    det1 = {2: (10, 20), 3: None, 4: (30, 40), 5: (50, 60)}
+    det2 = {2: (11, 21), 3: (1, 1), 4: None, 6: (70, 80)}
+    pts1, pts2, frames = matched_points(det1, det2)
+    assert frames == [2]  # 3 (None in det1), 4 (None in det2), 5/6 (missing) dropped
+    np.testing.assert_array_equal(pts1, [[10, 20]])
+    np.testing.assert_array_equal(pts2, [[11, 21]])
+
+
+def test_matched_points_empty_when_no_overlap():
+    pts1, pts2, frames = matched_points({2: (1, 2)}, {3: (3, 4)})
+    assert frames == []
+    assert pts1.shape == (0, 2) and pts2.shape == (0, 2)

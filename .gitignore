@@ -1,0 +1,31 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Secrets / config overrides
+appsettings.*.json
+!appsettings.Development.json
+
+# Node
+node_modules/
+.nuxt/
+.output/
+
+# OS
+.DS_Store
+Thumbs.db

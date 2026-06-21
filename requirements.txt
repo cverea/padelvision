@@ -1,0 +1,10 @@
+# Core runtime dependencies. See pyproject.toml optional extras for the
+# detection (tensorflow/keras), viz (matplotlib) and capture (requests/keyboard)
+# feature groups.
+numpy
+opencv-python
+pandas
+
+# Optional: live IP-webcam capture (padelvision capture command)
+# requests
+# keyboard

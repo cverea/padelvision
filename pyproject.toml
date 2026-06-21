@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "padelvision"
+version = "0.1.0"
+description = "3D padel-ball trajectory reconstruction from stereo video"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "pandas",
+]
+
+[project.optional-dependencies]
+# Ball detection needs a deep-learning backend.
+detection = ["tensorflow", "keras"]
+# Plotting.
+viz = ["matplotlib"]
+# Live capture from IP webcams.
+capture = ["requests", "keyboard"]
+# Development / testing.
+dev = ["pytest"]
+
+[project.scripts]
+padelvision = "padelvision.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["padelvision*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
